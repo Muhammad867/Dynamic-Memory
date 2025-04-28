@@ -1,3 +1,5 @@
+// processes are picked based on input order if arrival time is same.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -119,20 +121,38 @@ int main() {
     scanf("%d", &totalMemory);
     initializeMemory(totalMemory);
 
-    Process processes[MAX_PROCESSES] = {
-        {"P1", 0, 100, false},
-        {"P2", 1, 200, false},
-        {"P3", 2, 300, false},
-        {"P4", 3, 150, false},
-        {"P5", 4, 80,  false},
-        {"P6", 5, 220, false},
-        {"P7", 6, 90,  false},
-        {"P8", 7, 130, false},
-        {"P9", 8, 250, false},
-        {"P10", 9, 60, false}
-    };
+    int n;
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
 
-    int n = 10;
+    if (n > MAX_PROCESSES) {
+        printf("❌ Error: Maximum number of processes is %d\n", MAX_PROCESSES);
+        return 1;
+    }
+
+    Process processes[MAX_PROCESSES];
+
+    printf("Enter process details (PID ArrivalTime Size):\n");
+    for (int i = 0; i < n; i++) {
+        scanf("%s %d %d", processes[i].pid, &processes[i].arrival, &processes[i].size);
+        processes[i].allocated = false;
+
+        // Check for duplicate PID
+        bool isUnique = true;
+        for (int j = 0; j < i; j++) {
+            if (strcmp(processes[j].pid, processes[i].pid) == 0) {
+                isUnique = false;
+                break;
+            }
+        }
+
+        if (!isUnique) {
+            printf("❌ Error: Process ID %s already exists. Please enter a unique Process ID.\n", processes[i].pid);
+            i--; // redo this entry
+            continue;
+        }
+    }
+
     int currentTime = 0;
 
     printf("\n📦 Simulating Dynamic Partitioning with FIFO Replacement...\n");
@@ -142,11 +162,9 @@ int main() {
 
         for (int i = 0; i < n; i++) {
             if (!processes[i].allocated && processes[i].arrival <= currentTime) {
-                // Try to allocate; if it fails, run replacement
                 while (!allocateMemory(&processes[i])) {
                     deallocateOldest();
                 }
-
                 displayMemory(totalMemory);
             }
 
@@ -158,5 +176,6 @@ int main() {
         currentTime++;
     }
 
+    printf("\n✅ All processes have been allocated successfully!\n");
     return 0;
 }

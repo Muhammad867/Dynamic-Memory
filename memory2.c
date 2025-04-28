@@ -1,20 +1,22 @@
+// processes are picked based on size if arrival time is same.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 
 #define MAX_BLOCKS 100
-#define MAX_PROCESSES 20
+#define MAX_PROCESSES 50
 
 typedef struct {
     int start;
     int size;
     bool free;
-    char pid[10];
+    char pid[20];
 } MemoryBlock;
 
 typedef struct {
-    char pid[10];
+    char pid[20];
     int arrival;
     int size;
     bool allocated;
@@ -23,7 +25,7 @@ typedef struct {
 MemoryBlock memory[MAX_BLOCKS];
 int blockCount = 1;
 
-char fifoQueue[MAX_PROCESSES][10]; // For FIFO replacement
+char fifoQueue[MAX_PROCESSES][20]; // For FIFO replacement
 int fifoFront = 0, fifoRear = 0;
 
 void enqueue(const char *pid) {
@@ -69,6 +71,11 @@ void mergeFreeBlocks() {
 }
 
 void deallocateOldest() {
+    if (fifoFront == fifoRear) {
+        printf("🚨 Error: FIFO queue empty! No processes to deallocate.\n");
+        return;
+    }
+
     char *oldestPid = dequeue();
     printf("🔄 Replacing process %s due to lack of memory\n", oldestPid);
     for (int i = 0; i < blockCount; i++) {
@@ -113,32 +120,66 @@ bool allocateMemory(Process *p) {
     return false; // Not enough space
 }
 
+// Sorting function: prioritize smaller size if arrival time is same
+void sortProcesses(Process *processes, int n, int currentTime) {
+    for (int i = 0; i < n-1; i++) {
+        for (int j = 0; j < n-i-1; j++) {
+            if (!processes[j].allocated && !processes[j+1].allocated &&
+                processes[j].arrival <= currentTime && processes[j+1].arrival <= currentTime) {
+
+                if (processes[j].size > processes[j+1].size) {
+                    Process temp = processes[j];
+                    processes[j] = processes[j+1];
+                    processes[j+1] = temp;
+                }
+            }
+        }
+    }
+}
+
+// Check for duplicate PIDs
+bool isDuplicate(Process *processes, int count, const char *pid) {
+    for (int i = 0; i < count; i++) {
+        if (strcmp(processes[i].pid, pid) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int main() {
     int totalMemory;
     printf("Enter total memory size (KB): ");
     scanf("%d", &totalMemory);
     initializeMemory(totalMemory);
 
-    Process processes[MAX_PROCESSES] = {
-        {"P1", 0, 100, false},
-        {"P2", 1, 200, false},
-        {"P3", 2, 300, false},
-        {"P4", 3, 150, false},
-        {"P5", 4, 80,  false},
-        {"P6", 5, 220, false},
-        {"P7", 6, 90,  false},
-        {"P8", 7, 130, false},
-        {"P9", 8, 250, false},
-        {"P10", 9, 60, false}
-    };
+    int n;
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
 
-    int n = 10;
+    Process processes[MAX_PROCESSES];
+
+    printf("Enter process details (PID Arrival_time Size_in_KB):\n");
+    for (int i = 0; i < n; i++) {
+        scanf("%s %d %d", processes[i].pid, &processes[i].arrival, &processes[i].size);
+
+        // Check for duplicate PID
+        if (isDuplicate(processes, i, processes[i].pid)) {
+            printf("❌ Error: Duplicate Process ID '%s' entered. Process IDs must be unique!\n", processes[i].pid);
+            return 1; // Exit with error
+        }
+
+        processes[i].allocated = false;
+    }
+
     int currentTime = 0;
 
-    printf("\n📦 Simulating Dynamic Partitioning with FIFO Replacement...\n");
+    printf("\n📦 Simulating Dynamic Partitioning with FIFO Replacement and Size-Based Selection...\n");
 
     while (1) {
         bool anyLeft = false;
+
+        sortProcesses(processes, n, currentTime); // Sort before each allocation step!
 
         for (int i = 0; i < n; i++) {
             if (!processes[i].allocated && processes[i].arrival <= currentTime) {
@@ -157,6 +198,8 @@ int main() {
         if (!anyLeft) break;
         currentTime++;
     }
+
+    printf("\n🎯 Simulation Complete!\n");
 
     return 0;
 }
